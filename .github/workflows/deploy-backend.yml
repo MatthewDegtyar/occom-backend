@@ -29,16 +29,42 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push Docker image (amd64 only)
+      - name: Build and push backend image (unique tag)
+        env:
+          IMAGE_TAG: ${{ github.sha }}
         run: |
           docker buildx build \
             --platform linux/amd64 \
-            -t ${{ secrets.ECR_BACKEND_URI }}:latest \
+            -t ${{ secrets.ECR_BACKEND_URI }}:$IMAGE_TAG \
             --push .
 
-      - name: Force ECS redeploy
+      - name: Register new task definition revision
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition occom-backend \
+            --query taskDefinition > taskdef.json
+
+          jq '
+            del(
+              .taskDefinitionArn,
+              .revision,
+              .status,
+              .requiresAttributes,
+              .compatibilities,
+              .registeredAt,
+              .registeredBy
+            )
+            | .containerDefinitions[0].image = "'"${{ secrets.ECR_BACKEND_URI }}:$IMAGE_TAG"'"
+          ' taskdef.json > new-taskdef.json
+
+          aws ecs register-task-definition \
+            --cli-input-json file://new-taskdef.json
+
+      - name: Update ECS service to new revision
         run: |
           aws ecs update-service \
             --cluster occom-backend \
             --service occom-backend-service-y2yx7ji7 \
-            --force-new-deployment
+            --task-definition occom-backend

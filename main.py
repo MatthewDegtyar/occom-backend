@@ -1,5 +1,6 @@
 import asyncio
 import os
+from dotenv import load_dotenv
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,7 +23,10 @@ from routes.textbooks import router as textbooks_router
 from routes.library_yearly_data import router as library_yearly_data_router
 from routes.vector_search import router as vector_search_router
 
-DATABASE_URL = "mysql+pymysql://root:password@localhost:3306/testdb"
+load_dotenv()
+
+#DATABASE_URL = f"mysql+pymysql://root:password@localhost:3306/testdb"
+DATABASE_URL = os.environ["DATABASE_URL"]
 
 engine = create_engine(
     DATABASE_URL,
@@ -45,7 +49,8 @@ app.add_middleware( # TODO: pull config from .env
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "http://127.0.0.1:3000"
+        "http://127.0.0.1:3000",
+        "https://theoccom.com"
     ],
     allow_credentials=True,
     allow_methods=["*"],

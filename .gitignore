@@ -1,4 +1,8 @@
+# misc
 __pycache__/
 .cache/
 v/
 static/
+
+# secrets
+.env
