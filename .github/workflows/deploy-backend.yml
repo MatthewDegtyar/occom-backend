@@ -41,7 +41,7 @@ jobs:
       - name: Force ECS redeploy
         run: |
           aws ecs update-service \
-            --cluster occom \
+            --cluster occom-backend \
             --service occom-backend \
             --force-new-deployment
  
