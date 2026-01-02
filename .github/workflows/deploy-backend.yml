@@ -44,4 +44,3 @@ jobs:
             --cluster occom-backend \
             --service occom-backend \
             --force-new-deployment
- 
