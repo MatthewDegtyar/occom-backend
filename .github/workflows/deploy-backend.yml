@@ -42,5 +42,5 @@ jobs:
         run: |
           aws ecs update-service \
             --cluster occom-backend \
-            --service occom-backend \
-            --force-new-deployment || true
+            --service occom-backend-service-y2yx7ji7 \
+            --force-new-deployment

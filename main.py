@@ -52,15 +52,6 @@ app.add_middleware( # TODO: pull config from .env
     allow_headers=["*"],
 )
 
-"""
-# Comment out for prod
-app.mount(
-    "/static/syllabi",
-    StaticFiles(directory="./static/syllabi"),
-    name="syllabi"
-)
-"""
-
 app.include_router(colleges_router)
 app.include_router(college_yearly_data_router)
 app.include_router(departments_router)
