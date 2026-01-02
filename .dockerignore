@@ -1,0 +1,25 @@
+# Python junk
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtualenvs
+v/
+venv/
+.venv/
+
+# Caches
+.cache/
+pip-wheel-metadata/
+
+# Git
+.git/
+.gitignore
+
+# Static / build artifacts (if not needed)
+static/
+build/
+dist/
+
+# OS junk
+.DS_Store
