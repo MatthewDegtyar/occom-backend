@@ -6,3 +6,4 @@ static/
 
 # secrets
 .env
+_utils/

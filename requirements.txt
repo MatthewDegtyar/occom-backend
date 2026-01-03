@@ -7,3 +7,5 @@ numpy
 fastapi
 sqlalchemy
 pydantic
+python-dotenv
+uvicorn
