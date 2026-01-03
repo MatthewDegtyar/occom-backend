@@ -1,12 +1,20 @@
-torch==2.1.2
 --extra-index-url https://download.pytorch.org/whl/cpu
 
-sentence-transformers
-faiss-cpu
-numpy
+# Core ML stack (known-compatible)
+torch==2.1.2
+transformers==4.35.2
+sentence-transformers==2.2.2
+
+# Numeric stack (must stay <2)
+numpy<2.0
+
+# Vector search
+faiss-cpu==1.7.4
+
+# API + DB
 fastapi
+uvicorn
 sqlalchemy
 pydantic
 python-dotenv
-uvicorn
 PyMySQL
