@@ -9,4 +9,4 @@ sqlalchemy
 pydantic
 python-dotenv
 uvicorn
-pymysql
+PyMySQL
