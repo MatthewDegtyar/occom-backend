@@ -35,7 +35,8 @@ jobs:
         run: |
           docker buildx build \
             --platform linux/amd64 \
-            -t ${{ secrets.ECR_BACKEND_URI }}:$IMAGE_TAG \
+            --provenance=false \
+            -t ${{ secrets.ECR_BACKEND_URI }}:${IMAGE_TAG} \
             --push .
 
       - name: Register new task definition revision
@@ -56,15 +57,19 @@ jobs:
               .registeredAt,
               .registeredBy
             )
-            | .containerDefinitions[0].image = "'"${{ secrets.ECR_BACKEND_URI }}:$IMAGE_TAG"'"
+            | .containerDefinitions[0].image = "'"${{ secrets.ECR_BACKEND_URI }}:${IMAGE_TAG}"'"
           ' taskdef.json > new-taskdef.json
 
-          aws ecs register-task-definition \
-            --cli-input-json file://new-taskdef.json
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://new-taskdef.json \
+            --query "taskDefinition.taskDefinitionArn" \
+            --output text)
+
+          echo "TASK_DEF_ARN=${TASK_DEF_ARN}" >> $GITHUB_ENV
 
       - name: Update ECS service to new revision
         run: |
           aws ecs update-service \
             --cluster occom-backend \
             --service occom-backend-service-y2yx7ji7 \
-            --task-definition occom-backend
+            --task-definition $TASK_DEF_ARN
