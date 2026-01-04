@@ -7,9 +7,10 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip \
+RUN pip install --upgrade pip \
     && pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
 
+# discard build stage for faster pulling
 
 # ---- runtime stage ----
 FROM python:3.10-slim
@@ -19,8 +20,13 @@ RUN apt-get update && apt-get install -y \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
+COPY requirements.txt .
 COPY --from=build /wheels /wheels
-RUN pip install --no-cache-dir /wheels/*
+
+RUN pip install --no-cache-dir \
+    --no-index \
+    --find-links=/wheels \
+    -r requirements.txt
 
 COPY . .
 

@@ -4,6 +4,7 @@
 torch==2.1.2
 transformers==4.35.2
 sentence-transformers==2.2.2
+huggingface_hub<0.26
 
 # Numeric stack (must stay <2)
 numpy<2.0
@@ -18,3 +19,6 @@ sqlalchemy
 pydantic
 python-dotenv
 PyMySQL
+
+# for MYSQL
+cryptography>=41.0.0

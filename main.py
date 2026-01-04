@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import event
+from sqlalchemy.engine import URL
 
 from core.deps import get_db
 from models import Base
@@ -26,15 +27,41 @@ from routes.vector_search import router as vector_search_router
 load_dotenv()
 
 #DATABASE_URL = f"mysql+pymysql://root:password@localhost:3306/testdb"
-DATABASE_URL = os.environ["DATABASE_URL"]
+#DATABASE_URL = os.environ["DATABASE_URL"]
+
+# stable import of credentials
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_PORT = int(os.getenv("DB_PORT", "3306"))
+DB_NAME = os.getenv("DB_NAME")
+
+missing = [k for k, v in {
+    "DB_USER": DB_USER,
+    "DB_PASSWORD": DB_PASSWORD,
+    "DB_NAME": DB_NAME,
+}.items() if not v]
+
+if missing:
+    raise RuntimeError(f"Missing required env vars: {', '.join(missing)}")
+
+DATABASE_URL = URL.create(
+    drivername="mysql+pymysql",
+    username=DB_USER,
+    password=DB_PASSWORD,   # safely contain password
+    host=DB_HOST,
+    port=DB_PORT,
+    database=DB_NAME,
+)
 
 engine = create_engine(
     DATABASE_URL,
     echo=False,
     future=True,
-    pool_size=100,
-    max_overflow=0,
+    pool_size=20,        # see note below
+    max_overflow=10,
     pool_timeout=30,
+    pool_pre_ping=True, # for tunnels + ECS
 )
 
 SessionLocal = sessionmaker(
