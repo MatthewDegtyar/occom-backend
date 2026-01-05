@@ -27,6 +27,12 @@ from routes.vector_search import router as vector_search_router
 if os.getenv("ENV") != "PROD":
     load_dotenv()
 
+print("=== ENV DUMP START ===")
+print("DB_HOST:", repr(os.environ.get("DB_HOST")))
+print("DB_USER:", repr(os.environ.get("DB_USER")))
+print("DB_NAME:", repr(os.environ.get("DB_NAME")))
+print("ENV keys contain DB_HOST?", "DB_HOST" in os.environ)
+print("=== ENV DUMP END ===")
 
 # stable import of credentials
 DB_USER = os.getenv("DB_USER")
