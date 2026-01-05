@@ -7,6 +7,7 @@ from models import (
         Department, 
         Course, 
         Textbook, 
+        Professor,
         course_textbooks
     )
 import faiss
@@ -235,4 +236,199 @@ def search_vector(body: SearchBody, db: Session = Depends(get_db)):
         "summary": summary,
         "results": results,
         "dev": {"k": body.k, "q": body.q, "s": body.s}
+    }
+
+# ===== PROFESSOR VECTOR CACHE =====
+
+PROF_INDEX_PATH = "./.cache/prof_vector_cache.faiss"
+PROF_META_PATH = "./.cache/prof_vector_cache.npy"
+
+os.makedirs("./.cache", exist_ok=True)
+
+prof_index = None
+prof_cache = None
+prof_built = False
+
+def save_prof_cache():
+    faiss.write_index(prof_index, PROF_INDEX_PATH)
+    np.save(PROF_META_PATH, prof_cache, allow_pickle=True)
+
+
+def load_prof_cache(db: Session):
+    global prof_index, prof_cache, prof_built
+
+    if not os.path.exists(PROF_INDEX_PATH) or not os.path.exists(PROF_META_PATH):
+        return False
+
+    try:
+        prof_index = faiss.read_index(PROF_INDEX_PATH)
+        prof_cache = np.load(PROF_META_PATH, allow_pickle=True).tolist()
+        prof_built = True
+        return True
+    except Exception:
+        return False
+
+def flatten_json(value) -> str:
+    """
+    Convert JSON-like data (dict / list / scalar) into a readable string
+    without keys noise or URLs.
+    """
+    if not value:
+        return ""
+
+    if isinstance(value, str):
+        return value
+
+    if isinstance(value, list):
+        return " ".join(flatten_json(v) for v in value)
+
+    if isinstance(value, dict):
+        parts = []
+        for k, v in value.items():
+            # skip obvious junk
+            if k.lower() in {"url", "link", "email", "phone"}:
+                continue
+            parts.append(flatten_json(v))
+        return " ".join(parts)
+
+    return ""
+
+
+def build_prof_index(db: Session):
+    global prof_index, prof_cache, prof_built
+
+    rows = (
+        db.query(Professor)
+        .join(Department, isouter=True)
+        .join(College, isouter=True)
+        .order_by(Professor.professor_id)
+        .all()
+    )
+
+    texts = []
+    prof_cache = []
+
+    for p in rows:
+        # --- high-signal text ---
+        name = p.name or ""
+        title = p.title or ""
+        bio = p.bio or ""
+
+        research = flatten_json(p.research_interests)
+        publications = flatten_json(p.publications)
+        cv_text = flatten_json(p.cv_data)
+
+        dept_name = p.department.name if p.department else ""
+        college_name = p.college.name if p.college else ""
+
+        # intentionally structured text
+        text = f"""
+        {name}
+        {title}
+        {dept_name}
+        {college_name}
+
+        Research interests:
+        {research}
+
+        Publications:
+        {publications}
+
+        Background:
+        {bio}
+        {cv_text}
+        """.strip()
+
+        if not text:
+            continue
+
+        primary_email = None
+        if isinstance(p.emails, list) and p.emails:
+            primary_email = p.emails[0]
+
+        prof_cache.append({
+            "professor_id": p.professor_id,
+            "name": p.name,
+            "title": p.title,
+            "emails": p.emails,
+            "primary_email": primary_email,
+            "bio": p.bio,
+            "department_id": p.department_id,
+            "college_id": p.college_id,
+        })
+
+        texts.append(text)
+
+    if not texts:
+        prof_built = True
+        return
+
+    embeddings = model.encode(
+        texts,
+        convert_to_numpy=True,
+        normalize_embeddings=True,
+    )
+
+    dim = embeddings.shape[1]
+    prof_index = faiss.IndexFlatIP(dim)
+    prof_index.add(embeddings)
+
+    save_prof_cache()
+    prof_built = True
+
+def ensure_prof_index(db: Session):
+    global prof_built
+    if prof_built:
+        return
+    if load_prof_cache(db):
+        return
+    build_prof_index(db)
+
+
+@router.post("/professors")
+def search_professors(body: SearchBody, db: Session = Depends(get_db)):
+    ensure_prof_index(db)
+
+    if prof_index is None:
+        return {"results": []}
+
+    q_emb = model.encode(
+        [body.q],
+        convert_to_numpy=True,
+        normalize_embeddings=True,
+    )
+
+    scores, idxs = prof_index.search(q_emb, body.k)
+
+    results = []
+    for idx, score in zip(idxs[0], scores[0]):
+        if score < body.s:
+            continue
+
+        p = prof_cache[idx]
+
+        dept = (
+            db.query(Department)
+            .filter(Department.department_id == p["department_id"])
+            .first()
+        )
+
+        results.append({
+            "professor_id": p["professor_id"],
+            "name": p["name"],
+            "title": p["title"],
+            "emails": p["emails"],
+            "primary_email": p["primary_email"],
+            "bio": p["bio"],
+            "score": float(score),
+            "department": {
+                "department_id": dept.department_id,
+                "name": dept.name,
+                "code": dept.code,
+            } if dept else None,
+        })
+
+    return {
+        "results": results,
+        "dev": {"q": body.q, "k": body.k, "s": body.s},
     }

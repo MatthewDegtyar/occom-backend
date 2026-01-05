@@ -64,6 +64,17 @@ engine = create_engine(
     pool_pre_ping=True, # for tunnels + ECS
 )
 
+"""
+
+engine = create_engine(
+    DATABASE_URL,
+    echo=False,
+    future=True,
+    pool_size=100,
+    max_overflow=0,
+    pool_timeout=30,
+)
+"""
 SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
