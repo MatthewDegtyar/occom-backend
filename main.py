@@ -27,13 +27,6 @@ from routes.vector_search import router as vector_search_router
 if os.getenv("ENV") != "PROD":
     load_dotenv()
 
-print("=== ENV DUMP START ===")
-print("DB_HOST:", repr(os.environ.get("DB_HOST")))
-print("DB_USER:", repr(os.environ.get("DB_USER")))
-print("DB_NAME:", repr(os.environ.get("DB_NAME")))
-print("ENV keys contain DB_HOST?", "DB_HOST" in os.environ)
-print("=== ENV DUMP END ===")
-
 # stable import of credentials
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
@@ -93,7 +86,8 @@ app.add_middleware( # TODO: pull config from .env
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "https://theoccom.com"
+        "https://theoccom.com",
+        "https://theoccom.com/"
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -123,12 +117,18 @@ async def log_pool_stats(): # debug number of mysql conncetions
             f"size={pool.size()} "
             f"overflow={pool.overflow()}"
         )
+        print("=== ENV DUMP START ===")
+        print("DB_HOST:", repr(os.environ.get("DB_HOST")))
+        print("DB_USER:", repr(os.environ.get("DB_USER")))
+        print("DB_NAME:", repr(os.environ.get("DB_NAME")))
+        print("ENV keys contain DB_HOST?", "DB_HOST" in os.environ)
+        print("=== ENV DUMP END ===")
         await asyncio.sleep(10)
 
 @app.on_event("startup")
 async def startup():
     os.makedirs("./.cache", exist_ok=True) # ensure critical dirs exist for routes/vector_search.py
-    #asyncio.create_task(log_pool_stats())
+    asyncio.create_task(log_pool_stats())
     Base.metadata.create_all(bind=engine)
 
 ### mysql connection debug ###
