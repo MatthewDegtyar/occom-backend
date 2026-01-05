@@ -5,11 +5,9 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy import event
-from sqlalchemy.engine import URL
 
+from core.db import engine
 from core.deps import get_db
 from models import Base
 
@@ -24,75 +22,31 @@ from routes.textbooks import router as textbooks_router
 from routes.library_yearly_data import router as library_yearly_data_router
 from routes.vector_search import router as vector_search_router
 
+
+# Load env only for local dev
 if os.getenv("ENV") != "PROD":
     load_dotenv()
 
-# stable import of credentials
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_HOST = os.getenv("DB_HOST")
-DB_PORT = int(os.getenv("DB_PORT"))
-DB_NAME = os.getenv("DB_NAME")
-
-missing = [k for k, v in {
-    "DB_USER": DB_USER,
-    "DB_PASSWORD": DB_PASSWORD,
-    "DB_NAME": DB_NAME,
-}.items() if not v]
-
-if missing:
-    raise RuntimeError(f"Missing required env vars: {', '.join(missing)}")
-
-DATABASE_URL = URL.create(
-    drivername="mysql+pymysql",
-    username=DB_USER,
-    password=DB_PASSWORD,   # safely contain password
-    host=DB_HOST,
-    port=DB_PORT,
-    database=DB_NAME,
-)
-#DATABASE_URL = f"mysql+pymysql://root:password@localhost:3306/testdb"
-#DATABASE_URL = os.environ["DATABASE_URL"]
-engine = create_engine(
-    DATABASE_URL,
-    echo=False,
-    future=True,
-    pool_size=20,        # see note below
-    max_overflow=10,
-    pool_timeout=30,
-    pool_pre_ping=True, # for tunnels + ECS
-)
-
-"""
-engine = create_engine(
-    DATABASE_URL,
-    echo=False,
-    future=True,
-    pool_size=100,
-    max_overflow=0,
-    pool_timeout=30,
-)
-"""
-SessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=engine
-)
 
 app = FastAPI()
 
-app.add_middleware( # TODO: pull config from .env 
+
+# ---------------- CORS ----------------
+
+app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "https://theoccom.com",
-        "https://theoccom.com/"
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ---------------- Routers ----------------
 
 app.include_router(colleges_router)
 app.include_router(college_yearly_data_router)
@@ -105,11 +59,17 @@ app.include_router(textbooks_router)
 app.include_router(library_yearly_data_router)
 app.include_router(vector_search_router)
 
-@app.get("/health") # MUST BE /health FOR EC2 TARGET GROUP CONFIG
+
+# ---------------- Health ----------------
+
+@app.get("/health")
 def health():
     return {"status": "ok"}
 
-async def log_pool_stats(): # debug number of mysql conncetions
+
+# ---------------- Debug (optional) ----------------
+
+async def log_pool_stats():
     while True:
         pool = engine.pool
         print(
@@ -117,26 +77,27 @@ async def log_pool_stats(): # debug number of mysql conncetions
             f"size={pool.size()} "
             f"overflow={pool.overflow()}"
         )
-        print("=== ENV DUMP START ===")
-        print("DB_HOST:", repr(os.environ.get("DB_HOST")))
-        print("DB_USER:", repr(os.environ.get("DB_USER")))
-        print("DB_NAME:", repr(os.environ.get("DB_NAME")))
-        print("ENV keys contain DB_HOST?", "DB_HOST" in os.environ)
-        print("=== ENV DUMP END ===")
         await asyncio.sleep(10)
+
 
 @app.on_event("startup")
 async def startup():
-    os.makedirs("./.cache", exist_ok=True) # ensure critical dirs exist for routes/vector_search.py
-    asyncio.create_task(log_pool_stats())
-    Base.metadata.create_all(bind=engine)
+    os.makedirs("./.cache", exist_ok=True)
 
-### mysql connection debug ###
+    # Enable only when actively debugging
+    if os.getenv("DEBUG_DB_POOL") == "1":
+        asyncio.create_task(log_pool_stats())
+
+
+# ---------------- SQLAlchemy events (optional) ----------------
+
 @event.listens_for(engine, "checkout")
 def checkout(dbapi_conn, conn_record, conn_proxy):
-    print("CHECKOUT", id(dbapi_conn))
+    if os.getenv("DEBUG_DB_POOL") == "1":
+        print("CHECKOUT", id(dbapi_conn))
+
 
 @event.listens_for(engine, "checkin")
 def checkin(dbapi_conn, conn_record):
-    print("CHECKIN", id(dbapi_conn))
-### ###
+    if os.getenv("DEBUG_DB_POOL") == "1":
+        print("CHECKIN", id(dbapi_conn))
