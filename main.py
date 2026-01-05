@@ -24,16 +24,15 @@ from routes.textbooks import router as textbooks_router
 from routes.library_yearly_data import router as library_yearly_data_router
 from routes.vector_search import router as vector_search_router
 
-load_dotenv()
+if os.getenv("ENV") != "PROD":
+    load_dotenv()
 
-#DATABASE_URL = f"mysql+pymysql://root:password@localhost:3306/testdb"
-#DATABASE_URL = os.environ["DATABASE_URL"]
 
 # stable import of credentials
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = int(os.getenv("DB_PORT", "3306"))
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = int(os.getenv("DB_PORT"))
 DB_NAME = os.getenv("DB_NAME")
 
 missing = [k for k, v in {
@@ -53,7 +52,8 @@ DATABASE_URL = URL.create(
     port=DB_PORT,
     database=DB_NAME,
 )
-
+#DATABASE_URL = f"mysql+pymysql://root:password@localhost:3306/testdb"
+#DATABASE_URL = os.environ["DATABASE_URL"]
 engine = create_engine(
     DATABASE_URL,
     echo=False,
@@ -65,7 +65,6 @@ engine = create_engine(
 )
 
 """
-
 engine = create_engine(
     DATABASE_URL,
     echo=False,
